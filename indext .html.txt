@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My 3D AR Demo</title>
+
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    #renderCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+
+    #title {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      padding: 12px 16px;
+      background: white;
+      border-radius: 8px;
+      z-index: 1;
+    }
+
+    #status {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      padding: 10px;
+      background: white;
+      z-index: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="title">My 3D Model Demo</div>
+  <div id="status">Loading model...</div>
+
+  <canvas id="renderCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById("renderCanvas");
+    const status = document.getElementById("status");
+
+    const engine = new BABYLON.Engine(canvas, true);
+
+    async function createScene() {
+      const scene = new BABYLON.Scene(engine);
+
+      scene.clearColor = new BABYLON.Color4(
+        0.92, 0.94, 0.97, 1
+      );
+
+      const camera = new BABYLON.ArcRotateCamera(
+        "camera",
+        -Math.PI / 2,
+        Math.PI / 2.5,
+        5,
+        BABYLON.Vector3.Zero(),
+        scene
+      );
+
+      camera.attachControl(canvas, true);
+      camera.wheelPrecision = 50;
+      camera.minZ = 0.01;
+
+      const light = new BABYLON.HemisphericLight(
+        "light",
+        new BABYLON.Vector3(0, 1, 0),
+        scene
+      );
+
+      light.intensity = 1.2;
+
+      try {
+        const result = await BABYLON.SceneLoader.ImportMeshAsync(
+          "",
+          "./models/",
+          "model.glb",
+          scene
+        );
+
+        const meshes = result.meshes.filter(
+          mesh => mesh.getTotalVertices() > 0
+        );
+
+        if (meshes.length > 0) {
+          let min = new BABYLON.Vector3(
+            Infinity, Infinity, Infinity
+          );
+
+          let max = new BABYLON.Vector3(
+            -Infinity, -Infinity, -Infinity
+          );
+
+          meshes.forEach(mesh => {
+            mesh.computeWorldMatrix(true);
+
+            const bounds = mesh.getBoundingInfo().boundingBox;
+
+            min = BABYLON.Vector3.Minimize(
+              min, bounds.minimumWorld
+            );
+
+            max = BABYLON.Vector3.Maximize(
+              max, bounds.maximumWorld
+            );
+          });
+
+          const center = min.add(max).scale(0.5);
+          const size = max.subtract(min).length();
+
+          camera.setTarget(center);
+          camera.radius = Math.max(size * 1.5, 0.5);
+        }
+
+        status.textContent = "Model loaded successfully";
+      } catch (error) {
+        console.error(error);
+        status.textContent =
+          "Could not load model. Check the file name and path.";
+      }
+
+      return scene;
+    }
+
+    createScene().then(scene => {
+      engine.runRenderLoop(() => scene.render());
+    });
+
+    window.addEventListener("resize", () => {
+      engine.resize();
+    });
+  </script>
+</body>
+</html>
